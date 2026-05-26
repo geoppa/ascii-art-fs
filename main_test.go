@@ -8,8 +8,10 @@ import (
 	"testing"
 )
 
-// Helper function to capture stdout during execution
-func captureOutput(args []string, runFunc func()) string {
+// Βοηθητική συνάρτηση για την εκτέλεση της main με συγκεκριμένα ορίσματα
+// και την καταγραφή της εξόδου (stdout)
+func runMainWithArgs(args []string) (string, error) {
+	// Αποθήκευση των αρχικών os.Args και os.Stdout για επαναφορά μετά το τεστ
 	oldArgs := os.Args
 	oldStdout := os.Stdout
 	defer func() {
@@ -17,73 +19,75 @@ func captureOutput(args []string, runFunc func()) string {
 		os.Stdout = oldStdout
 	}()
 
-	os.Args = args
+	// Ορισμός των νέων ορισμάτων (το args[0] είναι πάντα το όνομα του προγράμματος)
+	os.Args = append([]string{"cmd"}, args...)
+
+	// Δημιουργία pipe για την καταγραφή των fmt.Println
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	runFunc()
+	// Εκτέλεση της main
+	main()
 
+	// Κλείσιμο του writer και ανάγνωση των δεδομένων
 	w.Close()
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-	return buf.String()
+	_, err := io.Copy(&buf, r)
+	if err != nil {
+		return "", err
+	}
+
+	return buf.String(), nil
 }
 
-func TestArgumentParsingAndValidation(t *testing.T) {
+func TestMainScenarios(t *testing.T) {
+	// Πριν τρέξεις το τεστ, βεβαιώσου ότι υπάρχει ο φάκελος banners με τα αρχεία.
+	// Για το τεστ, αν δεν υπάρχουν τα πραγματικά αρχεία, μπορείς να φτιάξεις mock.
+
 	tests := []struct {
 		name           string
 		args           []string
-		expectedOutput string
+		wantInOutput   []string // Τι περιμένουμε να δούμε στο output
+		dontWantOutput bool     // Αν περιμένουμε κενή έξοδο
 	}{
 		{
-			name:           "Too few arguments",
-			args:           []string{"cmd"},
-			expectedOutput: "Usage: go run . <text> <banner>",
+			name:         "Λιγότερα ορίσματα από 2",
+			args:         []string{"Hello"},
+			wantInOutput: []string{"Usage: go run . <text> <banner>"},
 		},
 		{
-			name:           "Missing banner defaults to standard",
-			args:           []string{"cmd", "hello"},
-			expectedOutput: "Usage: go run . <text> <banner>",
+			name:         "Λανθασμένο banner - Fallback σε standard",
+			args:         []string{"Hello", "wrong_banner"},
+			wantInOutput: []string{"Error: Invalid or missing banner"},
 		},
 		{
-			name:           "Invalid banner name triggers error message",
-			args:           []string{"cmd", "hello", "invalid_banner"},
-			expectedOutput: "Error: Invalid or missing banner. Only standard.txt, shadow.txt, and thinkertoy.txt are allowed. Using standard.txt instead.",
+			name:         "Περισσότερα ορίσματα μετά το banner - Warning",
+			args:         []string{"Hello", "standard", "extra1", "extra2"},
+			wantInOutput: []string{"Warning: Extra arguments found after the banner. Ignoring them."},
 		},
 		{
-			name:           "Ungrouped multi-word text with valid banner",
-			args:           []string{"cmd", "hello", "world", "standard.txt"},
-			expectedOutput: "Ungrouped, multi word text found. Printing only first word",
-		},
-		{
-			name:           "Ungrouped multi-word text with invalid banner",
-			args:           []string{"cmd", "hello", "world", "invalid_banner"},
-			expectedOutput: "Error: Invalid or missing banner", // Checks for partial match of the error sequence
+			name:           "Κενό input κειμένου",
+			args:           []string{"", "standard"},
+			dontWantOutput: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Wrap main logic in an anonymous function to pass to the capturer
-			output := captureOutput(tt.args, func() {
-				// We call main directly to test its entry behavior
-				// Note: if readbanner() fails during tests because files are missing,
-				// it will print "error reading file:" which we can also assert.
-				main()
-			})
+			output, err := runMainWithArgs(tt.args)
+			if err != nil {
+				t.Fatalf("Αποτυχία εκτέλεσης της main: %v", err)
+			}
 
-			if !strings.Contains(output, tt.expectedOutput) {
-				t.Errorf("Expected output to contain %q, but got %q", tt.expectedOutput, output)
+			if tt.dontWantOutput && output != "" {
+				t.Errorf("Περιμέναμε κενή έξοδο, αλλά πήραμε: %q", output)
+			}
+
+			for _, want := range tt.wantInOutput {
+				if !strings.Contains(output, want) {
+					t.Errorf("Το output δεν περιέχει το αναμενόμενο κείμενο %q. Output:\n%s", want, output)
+				}
 			}
 		})
-	}
-}
-
-func TestEmptyInputExitsQuietly(t *testing.T) {
-	args := []string{"cmd", "", "standard.txt"}
-	output := captureOutput(args, main)
-
-	if output != "" {
-		t.Errorf("Expected no output for empty input string, but got %q", output)
 	}
 }

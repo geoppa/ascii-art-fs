@@ -1,49 +1,71 @@
 # ASCII Art Generator
 
-A simple Go program that converts text input into ASCII art using specific banner styles.
+A simple Go command-line tool that converts text strings into stylized ASCII art banners. It supports multiple fonts/styles by reading character maps from template files and includes smart argument validation.
 
 ## Features
-- Supports three banner styles: `standard`, `shadow`, and `thinkertoy`.
-- Handles newline characters (`\n`) within the input string.
-- Validates command-line arguments and provides helpful error messages.
+
+- **Multiple Banner Styles**: Supports `standard`, `shadow`, and `thinkertoy` layouts.
+- **Flexible Extensions**: Accepts banner names both with or without the `.txt` extension (e.g., `standard` or `standard.txt`).
+- **Robust Argument Parsing**: 
+  - Automatically falls back to `standard.txt` if an invalid banner is provided.
+  - Warns the user and safely ignores any extra or ungrouped arguments trailing after the banner name.
+- **Newline Support**: Properly interprets literal `\n` characters in your input string to print multi-line ASCII art.
+
+## Requirements
+
+- [Go](https://go.dev) (version 1.16 or higher recommended)
+- Banner template files (`standard.txt`, `shadow.txt`, `thinkertoy.txt`) placed in the root directory of the project.
+
+## Installation
+
+1. Clone or download this repository to your local machine.
+2. Ensure your banner template files are inside the project folder:
+   ```bash
+   .
+   ├── main.go
+   ├── standard.txt
+   ├── shadow.txt
+   └── thinkertoy.txt
+   ```
 
 ## Usage
 
-Run the program using `go run .` followed by your text and the desired banner name.
+Run the program via the terminal by passing your text string and the desired banner style as arguments:
 
+```bash
+go run . "<text>" <banner>
+```
+
+### Examples
+
+**Basic Usage:**
 ```bash
 go run . "Hello" standard
 ```
 
-### Banner Options
-You can specify the banner with or without the `.txt` extension:
-- `standard`
-- `shadow`
-- `thinkertoy`
-
-### Examples
-
-**Standard Style:**
+**Using literal newlines:**
 ```bash
-go run . "Go" standard
+go run . "Hello\nWorld" shadow
 ```
 
-**Shadow Style:**
-```bash
-go run . "Hello" shadow.txt
-```
+### Argument Edge Cases & Warnings
 
-## Behavior Notes
-- **Multi-word input:** If you provide multiple words without quotes (e.g., `go run . Hello World standard`), the program will notify you and only process the first word (`Hello`).
-- **Missing Banner:** If an invalid or no banner is provided, the program defaults to `standard.txt`.
-- **Empty Input:** Providing an empty string will result in no output.
+- **Missing/Invalid Banner**: If the banner is omitted or typed incorrectly, the program defaults to `standard.txt` and prints a warning:
+  ```bash
+  $ go run . "Hello" wrong_banner
+  Error: Invalid or missing banner. Only standard.txt, shadow.txt, and thinkertoy.txt are allowed. Using standard.txt instead.
+  ```
 
-## Installation
-Ensure you have [Go](https://go.dev) installed, then clone this repository and navigate to the project folder.
+- **Extra Arguments**: If you pass additional arguments after the banner, the program processes your requested text and prints a warning while ignoring the rest:
+  ```bash
+  $ go run . "Hello" standard extra_arg1 extra_arg2
+  Warning: Extra arguments found after the banner. Ignoring them.
+  [ASCII Art for "Hello" prints here]
+  ```
 
-```bash
-git clone <repository-url>
-cd <project-folder>
-```
+## How It Works
 
-*Note: This program requires the corresponding `.txt` banner files to be present in the root directory.*
+1. **Validation**: The program scans `os.Args` to isolate your text input and match a valid banner template.
+2. **File Reading**: It reads the selected `.txt` file, where each character block consists of 9 vertical lines (8 lines of art + 1 empty spacing line).
+3. **Calculation**: It computes the exact starting line for each character using its ASCII value offset (`(char - 32) * 9 + 1`).
+4. **Rendering**: It prints the text layer-by-layer horizontally to output the complete block graphic safely.

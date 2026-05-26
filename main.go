@@ -40,15 +40,20 @@ func main() {
 
 		// check if the user attempted a multi-word input even with a broken banner name
 		if len(os.Args) > 3 {
-			fmt.Println("Ungrouped, multi word text found. Printing only first word")
+			fmt.Println("Warning: Ungrouped or multi text found. Printing only first text. Usage: go run . [STRING] [BANNER]")
 		}
 
 		// since no valid banner matched, the first argument is assumed to be the text
 		input = os.Args[1]
 	} else {
+		// check extra arguments after banner
+		if len(os.Args) > bannerIndex+1 {
+			fmt.Println("Warning: Extra arguments found after the banner. Ignoring them. Usage: go run . [STRING] [BANNER]")
+		}
+
 		// check if there are ungrouped words between the first word and the banner
 		if bannerIndex > 2 {
-			fmt.Println("Ungrouped, multi word text found. Printing only first word")
+			fmt.Println("Warning: Ungrouped or multi word text found. Printing only first text. Usage: go run . [STRING] [BANNER]")
 		}
 		// if a banner is found, print only the very first word (the first argument) with it
 		input = os.Args[1]
@@ -108,7 +113,7 @@ func main() {
 }
 
 func readbanner(bannername string) ([]string, error) {
-	file, err := os.Open(bannername)
+	file, err := os.Open("banners/" + bannername)
 	if err != nil {
 		return nil, err
 	}
